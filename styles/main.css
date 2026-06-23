@@ -386,7 +386,7 @@ h3 {
 .pulse-x,
 .pulse-y,
 .pulse-z {
-  filter: drop-shadow(0 0 26px rgba(125, 211, 252, 0.48));
+  /* filter: drop-shadow(0 0 26px rgba(125, 211, 252, 0.48)); */
 }
 
 .manual-controls {
