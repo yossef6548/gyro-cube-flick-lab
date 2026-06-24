@@ -1,21 +1,22 @@
 import { dot3, length3, normalize3 } from './vector.js';
 
-export function selectProjectedAxis(containerAngularVelocity, projectedAxes, settings) {
+export function selectContainerAxis(containerAngularVelocity, cubeAxes, settings) {
   const speed = length3(containerAngularVelocity);
-  if (speed < settings.planarThreshold) return null;
+  if (speed < settings.spinThreshold) return null;
 
   const normalizedVelocity = normalize3(containerAngularVelocity);
   const directionSign = settings.snapDirectionSign ?? 1;
 
-  const candidates = Object.values(projectedAxes)
+  const candidates = Object.values(cubeAxes)
     .map((axis) => {
-      const motionAxis = axis.motion ?? axis.container ?? { x: axis.screen.x, y: axis.screen.y, z: 0 };
-      const score = dot3(normalizedVelocity, motionAxis);
+      const motionAxis = normalize3(axis.motion);
+      const signedScore = dot3(normalizedVelocity, motionAxis);
+
       return {
         axis: axis.axis,
-        direction: (Math.sign(score) || 1) * directionSign,
-        score: Math.abs(score),
-        signedScore: score,
+        direction: (Math.sign(signedScore) || 1) * directionSign,
+        score: Math.abs(signedScore),
+        signedScore,
         speed,
         vector: normalizedVelocity,
       };
@@ -25,7 +26,7 @@ export function selectProjectedAxis(containerAngularVelocity, projectedAxes, set
   const best = candidates[0];
   const runnerUp = candidates[1];
 
-  if (!best || best.score < settings.projectionConfidence) return null;
+  if (!best || best.score < settings.axisConfidence) return null;
 
   return {
     axis: best.axis,
