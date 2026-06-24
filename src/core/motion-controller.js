@@ -1,11 +1,12 @@
-import { selectProjectedAxis } from './flick-detector.js';
+import { selectContainerAxis } from './flick-detector.js';
 import { length3 } from './vector.js';
 
 const ZERO_RAW = Object.freeze({ alpha: 0, beta: 0, gamma: 0 });
+const ZERO_VECTOR = Object.freeze({ x: 0, y: 0, z: 0 });
 
 export class MotionController extends EventTarget {
   #settings;
-  #getProjectedAxes;
+  #getCubeAxes;
   #enabled = false;
   #touchActive = false;
   #smoothedRaw = { ...ZERO_RAW };
@@ -14,10 +15,10 @@ export class MotionController extends EventTarget {
   #stableSince = performance.now();
   #boundMotionHandler = this.#handleMotion.bind(this);
 
-  constructor(settings, getProjectedAxes) {
+  constructor(settings, getCubeAxes) {
     super();
     this.#settings = settings;
-    this.#getProjectedAxes = getProjectedAxes;
+    this.#getCubeAxes = getCubeAxes;
   }
 
   updateSettings(settings) {
@@ -63,19 +64,13 @@ export class MotionController extends EventTarget {
     this.#emitArmedState('Armed');
   }
 
-  detectManualVector(vector) {
-    const candidate = selectProjectedAxis({ x: vector.x, y: vector.y, z: 0 }, this.#getProjectedAxes(), {
-      ...this.#settings,
-      planarThreshold: 0.1,
-      projectionConfidence: 0,
-    });
-
-    return candidate ?? {
-      axis: 'x',
-      direction: 1,
-      confidence: 0,
+  detectManualSnap(axis, direction) {
+    return {
+      axis,
+      direction: Math.sign(direction) || 1,
+      confidence: 1,
       speed: 0,
-      containerVector: { x: 0, y: 0, z: 0 },
+      containerVector: { ...ZERO_VECTOR },
       runnerUpConfidence: 0,
     };
   }
@@ -91,9 +86,7 @@ export class MotionController extends EventTarget {
       new CustomEvent('telemetry', {
         detail: {
           raw: this.#smoothedRaw,
-          // Kept for the existing log UI. The detection itself uses the full 3D vector.
-          screenVector: { x: containerVector.x, y: containerVector.y },
-          containerVector,
+          container: containerVector,
           speed,
         },
       }),
@@ -125,7 +118,7 @@ export class MotionController extends EventTarget {
       return;
     }
 
-    const flick = selectProjectedAxis(containerVector, this.#getProjectedAxes(), this.#settings);
+    const flick = selectContainerAxis(containerVector, this.#getCubeAxes(), this.#settings);
     if (!flick) return;
 
     this.#cooldownUntil = now + this.#settings.cooldownMs;
@@ -171,8 +164,8 @@ function smoothRates(previous, next, smoothing) {
 }
 
 function mapRawToContainer(raw, sensorMap = {}) {
-  const containerX = sensorMap.containerX ?? sensorMap.screenX ?? { source: 'beta', sign: 1 };
-  const containerY = sensorMap.containerY ?? sensorMap.screenY ?? { source: 'gamma', sign: 1 };
+  const containerX = sensorMap.containerX ?? { source: 'beta', sign: 1 };
+  const containerY = sensorMap.containerY ?? { source: 'gamma', sign: 1 };
   const containerZ = sensorMap.containerZ ?? { source: 'alpha', sign: 1 };
 
   return {
