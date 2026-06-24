@@ -3,13 +3,15 @@ import { loadSettings, resetStoredSettings, saveSettings } from '../core/storage
 import { formatNumber } from '../core/format.js';
 
 const NUMBER_INPUTS = Object.freeze([
-  'planarThreshold',
-  'projectionConfidence',
+  'spinThreshold',
+  'axisConfidence',
   'cooldownMs',
   'neutralThreshold',
   'neutralDurationMs',
   'smoothing',
 ]);
+
+const CONTAINER_AXES = Object.freeze(['containerX', 'containerY', 'containerZ']);
 
 export class SettingsPanel extends EventTarget {
   #dialog;
@@ -55,16 +57,15 @@ export class SettingsPanel extends EventTarget {
     next.requireNeutral = data.get('requireNeutral') === 'on';
     next.ignoreWhileTouching = data.get('ignoreWhileTouching') === 'on';
     next.vibrationEnabled = data.get('vibrationEnabled') === 'on';
-    next.sensorMap = {
-      screenX: {
-        source: String(data.get('screenXSource')),
-        sign: Number(data.get('screenXSign')),
-      },
-      screenY: {
-        source: String(data.get('screenYSource')),
-        sign: Number(data.get('screenYSign')),
-      },
-    };
+    next.sensorMap = Object.fromEntries(
+      CONTAINER_AXES.map((axisName) => [
+        axisName,
+        {
+          source: String(data.get(`${axisName}Source`)),
+          sign: Number(data.get(`${axisName}Sign`)),
+        },
+      ]),
+    );
 
     this.#settings = next;
     saveSettings(next);
@@ -80,21 +81,19 @@ export class SettingsPanel extends EventTarget {
     this.#form.elements.requireNeutral.checked = this.#settings.requireNeutral;
     this.#form.elements.ignoreWhileTouching.checked = this.#settings.ignoreWhileTouching;
     this.#form.elements.vibrationEnabled.checked = this.#settings.vibrationEnabled;
-    this.#form.elements.screenXSource.value = this.#settings.sensorMap.screenX.source;
-    this.#form.elements.screenXSign.value = String(this.#settings.sensorMap.screenX.sign);
-    this.#form.elements.screenYSource.value = this.#settings.sensorMap.screenY.source;
-    this.#form.elements.screenYSign.value = String(this.#settings.sensorMap.screenY.sign);
+
+    for (const axisName of CONTAINER_AXES) {
+      const axis = this.#settings.sensorMap[axisName] ?? DEFAULT_SETTINGS.sensorMap[axisName];
+      this.#form.elements[`${axisName}Source`].value = axis.source;
+      this.#form.elements[`${axisName}Sign`].value = String(axis.sign);
+    }
+
     this.#renderOutputs();
   }
 
   #renderOutputs() {
-    setOutput('planarThresholdOutput', this.#settings.planarThreshold, 0, SETTING_UNITS.planarThreshold);
-    setOutput(
-      'projectionConfidenceOutput',
-      this.#settings.projectionConfidence,
-      2,
-      SETTING_UNITS.projectionConfidence,
-    );
+    setOutput('spinThresholdOutput', this.#settings.spinThreshold, 0, SETTING_UNITS.spinThreshold);
+    setOutput('axisConfidenceOutput', this.#settings.axisConfidence, 2, SETTING_UNITS.axisConfidence);
     setOutput('cooldownOutput', this.#settings.cooldownMs, 0, SETTING_UNITS.cooldownMs);
     setOutput('neutralThresholdOutput', this.#settings.neutralThreshold, 0, SETTING_UNITS.neutralThreshold);
     setOutput('neutralDurationOutput', this.#settings.neutralDurationMs, 0, SETTING_UNITS.neutralDurationMs);
