@@ -1,5 +1,5 @@
 import { selectProjectedAxis } from './flick-detector.js';
-import { length2 } from './vector.js';
+import { length3 } from './vector.js';
 
 const ZERO_RAW = Object.freeze({ alpha: 0, beta: 0, gamma: 0 });
 
@@ -48,7 +48,7 @@ export class MotionController extends EventTarget {
       window.addEventListener('devicemotion', this.#boundMotionHandler, { passive: true });
       this.#enabled = true;
       this.rearm();
-      this.#emitStatus('Motion enabled', 'ready');
+      this.#emitStatus('Motion enabled');
       return true;
     } catch (error) {
       this.#emitStatus(`Motion permission failed: ${error.message}`, 'error');
@@ -64,23 +64,37 @@ export class MotionController extends EventTarget {
   }
 
   detectManualVector(vector) {
-    return selectProjectedAxis(vector, this.#getProjectedAxes(), this.#settings);
+    const candidate = selectProjectedAxis({ x: vector.x, y: vector.y, z: 0 }, this.#getProjectedAxes(), {
+      ...this.#settings,
+      planarThreshold: 0.1,
+      projectionConfidence: 0,
+    });
+
+    return candidate ?? {
+      axis: 'x',
+      direction: 1,
+      confidence: 0,
+      speed: 0,
+      containerVector: { x: 0, y: 0, z: 0 },
+      runnerUpConfidence: 0,
+    };
   }
 
   #handleMotion(event) {
     const now = performance.now();
     const raw = normalizeRotationRate(event.rotationRate);
     this.#smoothedRaw = smoothRates(this.#smoothedRaw, raw, this.#settings.smoothing);
-    const screen = mapRawToScreen(this.#smoothedRaw, this.#settings.sensorMap);
-    const speed = length2(screen);
+    const containerVector = mapRawToContainer(this.#smoothedRaw, this.#settings.sensorMap);
+    const speed = length3(containerVector);
 
     this.dispatchEvent(
       new CustomEvent('telemetry', {
         detail: {
           raw: this.#smoothedRaw,
-          screen,
+          // Kept for the existing log UI. The detection itself uses the full 3D vector.
+          screenVector: { x: containerVector.x, y: containerVector.y },
+          containerVector,
           speed,
-          projectedAxes: this.#getProjectedAxes(),
         },
       }),
     );
@@ -111,7 +125,7 @@ export class MotionController extends EventTarget {
       return;
     }
 
-    const flick = selectProjectedAxis(screen, this.#getProjectedAxes(), this.#settings);
+    const flick = selectProjectedAxis(containerVector, this.#getProjectedAxes(), this.#settings);
     if (!flick) return;
 
     this.#cooldownUntil = now + this.#settings.cooldownMs;
@@ -121,7 +135,7 @@ export class MotionController extends EventTarget {
     this.dispatchEvent(new CustomEvent('flick', { detail: flick }));
   }
 
-  #emitStatus(message, tone) {
+  #emitStatus(message, tone = 'ready') {
     this.dispatchEvent(new CustomEvent('status', { detail: { message, tone } }));
   }
 
@@ -156,9 +170,14 @@ function smoothRates(previous, next, smoothing) {
   };
 }
 
-function mapRawToScreen(raw, sensorMap) {
+function mapRawToContainer(raw, sensorMap = {}) {
+  const containerX = sensorMap.containerX ?? sensorMap.screenX ?? { source: 'beta', sign: 1 };
+  const containerY = sensorMap.containerY ?? sensorMap.screenY ?? { source: 'gamma', sign: 1 };
+  const containerZ = sensorMap.containerZ ?? { source: 'alpha', sign: 1 };
+
   return {
-    x: raw[sensorMap.screenX.source] * sensorMap.screenX.sign,
-    y: raw[sensorMap.screenY.source] * sensorMap.screenY.sign,
+    x: raw[containerX.source] * containerX.sign,
+    y: raw[containerY.source] * containerY.sign,
+    z: raw[containerZ.source] * containerZ.sign,
   };
 }
