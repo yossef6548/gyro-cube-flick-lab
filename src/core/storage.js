@@ -23,17 +23,18 @@ function mergeSettings(defaults, stored) {
   return {
     ...structuredClone(defaults),
     ...stored,
-    sensorMap: {
-      ...structuredClone(defaults.sensorMap),
-      ...(stored?.sensorMap ?? {}),
-      screenX: {
-        ...defaults.sensorMap.screenX,
-        ...(stored?.sensorMap?.screenX ?? {}),
-      },
-      screenY: {
-        ...defaults.sensorMap.screenY,
-        ...(stored?.sensorMap?.screenY ?? {}),
-      },
-    },
+    sensorMap: mergeSensorMap(defaults.sensorMap, stored?.sensorMap),
   };
+}
+
+function mergeSensorMap(defaultMap, storedMap = {}) {
+  return Object.fromEntries(
+    Object.entries(defaultMap).map(([axisName, defaultAxis]) => [
+      axisName,
+      {
+        ...defaultAxis,
+        ...(storedMap?.[axisName] ?? {}),
+      },
+    ]),
+  );
 }
