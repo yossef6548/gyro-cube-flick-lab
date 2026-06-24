@@ -1,25 +1,30 @@
-import { dot2, length2, normalize2 } from './vector.js';
+import { dot3, length3, normalize3 } from './vector.js';
 
-export function selectProjectedAxis(screenVector, projectedAxes, settings) {
-  const speed = length2(screenVector);
+export function selectProjectedAxis(containerAngularVelocity, projectedAxes, settings) {
+  const speed = length3(containerAngularVelocity);
   if (speed < settings.planarThreshold) return null;
 
-  const normalizedVector = normalize2(screenVector);
-  const ranked = Object.values(projectedAxes)
+  const normalizedVelocity = normalize3(containerAngularVelocity);
+  const directionSign = settings.snapDirectionSign ?? 1;
+
+  const candidates = Object.values(projectedAxes)
     .map((axis) => {
-      const dot = dot2(normalizedVector, axis.screen);
+      const motionAxis = axis.motion ?? axis.container ?? { x: axis.screen.x, y: axis.screen.y, z: 0 };
+      const score = dot3(normalizedVelocity, motionAxis);
       return {
         axis: axis.axis,
-        direction: Math.sign(dot) || 1,
-        score: Math.abs(dot),
-        dot,
+        direction: (Math.sign(score) || 1) * directionSign,
+        score: Math.abs(score),
+        signedScore: score,
         speed,
-        vector: normalizedVector,
+        vector: normalizedVelocity,
       };
     })
     .sort((a, b) => b.score - a.score);
 
-  const best = ranked[0];
+  const best = candidates[0];
+  const runnerUp = candidates[1];
+
   if (!best || best.score < settings.projectionConfidence) return null;
 
   return {
@@ -27,7 +32,7 @@ export function selectProjectedAxis(screenVector, projectedAxes, settings) {
     direction: best.direction,
     confidence: best.score,
     speed,
-    screenVector: normalizedVector,
-    runnerUpConfidence: ranked[1]?.score ?? 0,
+    containerVector: normalizedVelocity,
+    runnerUpConfidence: runnerUp?.score ?? 0,
   };
 }
