@@ -23,16 +23,16 @@ const elements = {
 const settingsPanel = new SettingsPanel(elements.settingsDialog, elements.settingsForm);
 const cube = new CubeOrientation(elements.cube);
 const logs = new LogPanel(elements.logsDialog);
-const motion = new MotionController(settingsPanel.getSettings(), () => cube.getProjectedAxes());
+const motion = new MotionController(settingsPanel.getSettings(), () => cube.getCubeAxes());
 
 initialize();
 
 function initialize() {
-  renderAxisGuide(cube.getProjectedAxes());
+  renderAxisGuide(cube.getCubeAxes());
   bindUi();
   bindMotion();
   bindCube();
-  logs.add('Loaded landscape-first flick lab.');
+  logs.add('Loaded container-axis flick lab. Hold the phone as if it physically contains the cube.');
 }
 
 function bindUi() {
@@ -58,15 +58,12 @@ function bindUi() {
     logs.add('Settings updated.');
   });
 
-  for (const button of document.querySelectorAll('[data-manual-vector]')) {
+  for (const button of document.querySelectorAll('[data-manual-axis]')) {
     button.addEventListener('click', () => {
-      const vector = parseManualVector(button.dataset.manualVector);
-      const candidate = motion.detectManualVector(vector);
-      if (!candidate) {
-        logs.add(`Manual ${button.textContent.trim()} did not match a projected cube axis.`);
-        return;
-      }
-      performSnap(candidate, `Manual ${button.textContent.trim()}`);
+      const axis = button.dataset.manualAxis;
+      const direction = Number(button.dataset.manualDirection);
+      const candidate = motion.detectManualSnap(axis, direction);
+      performSnap(candidate, `Manual ${axis.toUpperCase()}${direction > 0 ? '+' : '−'}`);
     });
   }
 
@@ -87,7 +84,7 @@ function bindMotion() {
   });
 
   motion.addEventListener('telemetry', (event) => {
-    logs.renderTelemetry(event.detail.raw, event.detail.screen, event.detail.speed);
+    logs.renderTelemetry(event.detail.raw, event.detail.container, event.detail.speed);
   });
 
   motion.addEventListener('flick', (event) => {
@@ -97,7 +94,7 @@ function bindMotion() {
 
 function bindCube() {
   cube.addEventListener('change', (event) => {
-    renderAxisGuide(event.detail.projectedAxes);
+    renderAxisGuide(event.detail.cubeAxes);
   });
 }
 
@@ -105,15 +102,10 @@ function performSnap(flick, sourceLabel) {
   const move = cube.snap(flick.axis, flick.direction);
   elements.lastMoveStatus.textContent = `Last snap: ${move.label}`;
   logs.add(
-    `${move.label} · ${sourceLabel} · confidence ${formatNumber(flick.confidence, 2)} · local-axis snap #${move.moveCount}`,
+    `${move.label} · ${sourceLabel} · confidence ${formatNumber(flick.confidence, 2)} · current-local-axis snap #${move.moveCount}`,
   );
 
   if (settingsPanel.getSettings().vibrationEnabled && navigator.vibrate && sourceLabel.startsWith('Flick')) {
     navigator.vibrate(18);
   }
-}
-
-function parseManualVector(value) {
-  const [x, y] = value.split(',').map(Number);
-  return { x: x * 1000, y: y * 1000 };
 }
