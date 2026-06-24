@@ -1,150 +1,119 @@
-import { EVENT_LOG_LIMIT } from './config.js';
-import { CubeView } from './cube-view.js';
-import { MotionController } from './motion-controller.js';
-import { SettingsPanel } from './settings-panel.js';
-import { loadSettings, saveSettings } from './storage.js';
-import { axisLabel, formatNumber, meterScale, nowLabel } from './utils.js';
+import { CubeOrientation } from './core/cube-orientation.js';
+import { MotionController } from './core/motion-controller.js';
+import { formatNumber } from './core/format.js';
+import { SettingsPanel } from './ui/settings-panel.js';
+import { LogPanel } from './ui/log-panel.js';
+import { renderAxisGuide } from './ui/axis-guide.js';
 
 const elements = {
+  scene: document.getElementById('scene'),
   cube: document.getElementById('cube'),
-  cubeStage: document.getElementById('cubeStage'),
   enableMotionButton: document.getElementById('enableMotionButton'),
-  openSettingsButton: document.getElementById('openSettingsButton'),
-  resetCubeButton: document.getElementById('resetCubeButton'),
-  calibrateButton: document.getElementById('calibrateButton'),
+  settingsButton: document.getElementById('settingsButton'),
+  logsButton: document.getElementById('logsButton'),
+  resetButton: document.getElementById('resetButton'),
   motionStatus: document.getElementById('motionStatus'),
   armedStatus: document.getElementById('armedStatus'),
-  lastFlickStatus: document.getElementById('lastFlickStatus'),
-  eventLog: document.getElementById('eventLog'),
-  rawAlpha: document.getElementById('rawAlpha'),
-  rawBeta: document.getElementById('rawBeta'),
-  rawGamma: document.getElementById('rawGamma'),
-  rateX: document.getElementById('rateX'),
-  rateY: document.getElementById('rateY'),
-  rateZ: document.getElementById('rateZ'),
-  meterX: document.getElementById('meterX'),
-  meterY: document.getElementById('meterY'),
-  meterZ: document.getElementById('meterZ'),
+  lastMoveStatus: document.getElementById('lastMoveStatus'),
   settingsDialog: document.getElementById('settingsDialog'),
   settingsForm: document.getElementById('settingsForm'),
+  logsDialog: document.getElementById('logsDialog'),
 };
 
-const state = {
-  eventLog: [],
-};
+const settingsPanel = new SettingsPanel(elements.settingsDialog, elements.settingsForm);
+const cube = new CubeOrientation(elements.cube);
+const logs = new LogPanel(elements.logsDialog);
+const motion = new MotionController(settingsPanel.getSettings(), () => cube.getProjectedAxes());
 
-const settings = loadSettings();
-saveSettings(settings);
+initialize();
 
-const cubeView = new CubeView(elements.cube);
-const motionController = new MotionController(settings);
-const settingsPanel = new SettingsPanel(elements.settingsDialog, elements.settingsForm, settings);
+function initialize() {
+  renderAxisGuide(cube.getProjectedAxes());
+  bindUi();
+  bindMotion();
+  bindCube();
+  logs.add('Loaded landscape-first flick lab.');
+}
 
-bindUiEvents();
-bindMotionEvents();
-renderTelemetry({ alpha: 0, beta: 0, gamma: 0 }, { x: 0, y: 0, z: 0 });
-addLogEntry('Lab loaded. Use HTTPS on iPhone Safari, then press Enable motion.');
+function bindUi() {
+  elements.settingsButton.addEventListener('click', () => settingsPanel.open());
+  elements.logsButton.addEventListener('click', () => logs.open());
 
-function bindUiEvents() {
   elements.enableMotionButton.addEventListener('click', async () => {
-    elements.enableMotionButton.disabled = true;
-    setMotionStatus('Requesting motion permission…', 'waiting');
-    const enabled = await motionController.enable();
-    elements.enableMotionButton.disabled = false;
+    const enabled = await motion.enable();
     if (enabled) {
       elements.enableMotionButton.textContent = 'Motion enabled';
+      elements.enableMotionButton.setAttribute('aria-pressed', 'true');
     }
   });
 
-  elements.openSettingsButton.addEventListener('click', () => settingsPanel.open());
-
-  elements.resetCubeButton.addEventListener('click', () => {
-    cubeView.reset();
-    elements.lastFlickStatus.textContent = 'Last flick: —';
-    addLogEntry('Cube orientation reset.');
+  elements.resetButton.addEventListener('click', () => {
+    cube.reset();
+    elements.lastMoveStatus.textContent = 'Last snap: —';
+    logs.add('Cube reset to equal three-face orientation.');
   });
 
-  elements.calibrateButton.addEventListener('click', () => {
-    motionController.rearm();
-    addLogEntry('Detector re-armed manually.');
+  settingsPanel.addEventListener('change', (event) => {
+    motion.updateSettings(event.detail.settings);
+    logs.add('Settings updated.');
   });
 
-  for (const button of document.querySelectorAll('[data-manual-flick]')) {
+  for (const button of document.querySelectorAll('[data-manual-vector]')) {
     button.addEventListener('click', () => {
-      const [axis, directionText] = button.dataset.manualFlick.split(':');
-      performSnap({ axis, direction: Number(directionText), speed: 0, ratio: 0 }, true);
+      const vector = parseManualVector(button.dataset.manualVector);
+      const candidate = motion.detectManualVector(vector);
+      if (!candidate) {
+        logs.add(`Manual ${button.textContent.trim()} did not match a projected cube axis.`);
+        return;
+      }
+      performSnap(candidate, `Manual ${button.textContent.trim()}`);
     });
   }
 
-  elements.cubeStage.addEventListener('pointerdown', () => motionController.setTouchActive(true));
-  elements.cubeStage.addEventListener('pointerup', () => motionController.setTouchActive(false));
-  elements.cubeStage.addEventListener('pointercancel', () => motionController.setTouchActive(false));
-  elements.cubeStage.addEventListener('pointerleave', () => motionController.setTouchActive(false));
-
-  settingsPanel.addEventListener('change', (event) => {
-    motionController.updateSettings(event.detail.settings);
-    addLogEntry('Settings updated.');
-  });
+  elements.scene.addEventListener('pointerdown', () => motion.setTouchActive(true));
+  elements.scene.addEventListener('pointerup', () => motion.setTouchActive(false));
+  elements.scene.addEventListener('pointercancel', () => motion.setTouchActive(false));
+  elements.scene.addEventListener('pointerleave', () => motion.setTouchActive(false));
 }
 
-function bindMotionEvents() {
-  motionController.addEventListener('status', (event) => {
-    setMotionStatus(event.detail.message, event.detail.tone);
-    addLogEntry(event.detail.message);
+function bindMotion() {
+  motion.addEventListener('status', (event) => {
+    elements.motionStatus.textContent = event.detail.message;
+    logs.add(event.detail.message);
   });
 
-  motionController.addEventListener('telemetry', (event) => {
-    renderTelemetry(event.detail.raw, event.detail.mapped);
-  });
-
-  motionController.addEventListener('armed-state', (event) => {
+  motion.addEventListener('armed-state', (event) => {
     elements.armedStatus.textContent = event.detail.label;
   });
 
-  motionController.addEventListener('flick', (event) => {
-    performSnap(event.detail, false);
+  motion.addEventListener('telemetry', (event) => {
+    logs.renderTelemetry(event.detail.raw, event.detail.screen, event.detail.speed);
+  });
+
+  motion.addEventListener('flick', (event) => {
+    performSnap(event.detail, `Flick ${formatNumber(event.detail.speed)}°/s`);
   });
 }
 
-function performSnap(flick, isManual) {
-  const move = cubeView.snap(flick.axis, flick.direction);
-  const moveLabel = axisLabel(move.axis, move.direction);
-  const source = isManual ? 'Manual' : `Flick ${formatNumber(flick.speed)}°/s, ${formatNumber(flick.ratio, 1)}×`;
+function bindCube() {
+  cube.addEventListener('change', (event) => {
+    renderAxisGuide(event.detail.projectedAxes);
+  });
+}
 
-  elements.lastFlickStatus.textContent = `Last flick: ${moveLabel}`;
-  addLogEntry(`${moveLabel} snap · ${source}`);
+function performSnap(flick, sourceLabel) {
+  const move = cube.snap(flick.axis, flick.direction);
+  elements.lastMoveStatus.textContent = `Last snap: ${move.label}`;
+  logs.add(
+    `${move.label} · ${sourceLabel} · confidence ${formatNumber(flick.confidence, 2)} · local-axis snap #${move.moveCount}`,
+  );
 
-  const currentSettings = settingsPanel.getSettings();
-  if (currentSettings.vibrationEnabled && navigator.vibrate && !isManual) {
+  if (settingsPanel.getSettings().vibrationEnabled && navigator.vibrate && sourceLabel.startsWith('Flick')) {
     navigator.vibrate(18);
   }
 }
 
-function setMotionStatus(message, tone = 'idle') {
-  elements.motionStatus.textContent = message;
-  elements.motionStatus.className = `status-pill status-${tone}`;
-}
-
-function renderTelemetry(raw, mapped) {
-  elements.rawAlpha.textContent = formatNumber(raw.alpha);
-  elements.rawBeta.textContent = formatNumber(raw.beta);
-  elements.rawGamma.textContent = formatNumber(raw.gamma);
-
-  for (const axis of ['x', 'y', 'z']) {
-    const value = mapped[axis];
-    document.getElementById(`rate${axis.toUpperCase()}`).textContent = formatNumber(value);
-    document.getElementById(`meter${axis.toUpperCase()}`).style.transform = `scaleX(${meterScale(value)})`;
-  }
-}
-
-function addLogEntry(message) {
-  state.eventLog.unshift(`${nowLabel()} · ${message}`);
-  state.eventLog = state.eventLog.slice(0, EVENT_LOG_LIMIT);
-  elements.eventLog.innerHTML = state.eventLog.map((entry) => `<li>${escapeHtml(entry)}</li>`).join('');
-}
-
-function escapeHtml(value) {
-  const wrapper = document.createElement('span');
-  wrapper.textContent = value;
-  return wrapper.innerHTML;
+function parseManualVector(value) {
+  const [x, y] = value.split(',').map(Number);
+  return { x: x * 1000, y: y * 1000 };
 }

@@ -1,29 +1,31 @@
-import { absMax, secondLargestAbs } from './utils.js';
+import { selectProjectedAxis } from './flick-detector.js';
+import { length2 } from './vector.js';
 
-const ZERO_RATES = Object.freeze({ alpha: 0, beta: 0, gamma: 0 });
-const CUBE_AXES = ['x', 'y', 'z'];
+const ZERO_RAW = Object.freeze({ alpha: 0, beta: 0, gamma: 0 });
 
 export class MotionController extends EventTarget {
   #settings;
-  #isEnabled = false;
-  #isTouchActive = false;
-  #smoothedRaw = { ...ZERO_RATES };
+  #getProjectedAxes;
+  #enabled = false;
+  #touchActive = false;
+  #smoothedRaw = { ...ZERO_RAW };
   #cooldownUntil = 0;
-  #stableSince = performance.now();
   #waitingForNeutral = false;
+  #stableSince = performance.now();
   #boundMotionHandler = this.#handleMotion.bind(this);
 
-  constructor(settings) {
+  constructor(settings, getProjectedAxes) {
     super();
     this.#settings = settings;
+    this.#getProjectedAxes = getProjectedAxes;
   }
 
   updateSettings(settings) {
     this.#settings = settings;
   }
 
-  setTouchActive(isTouchActive) {
-    this.#isTouchActive = isTouchActive;
+  setTouchActive(isActive) {
+    this.#touchActive = isActive;
   }
 
   async enable() {
@@ -33,9 +35,9 @@ export class MotionController extends EventTarget {
     }
 
     try {
-      const permissionApi = window.DeviceMotionEvent?.requestPermission;
-      if (typeof permissionApi === 'function') {
-        const permission = await permissionApi.call(window.DeviceMotionEvent);
+      const requestPermission = window.DeviceMotionEvent?.requestPermission;
+      if (typeof requestPermission === 'function') {
+        const permission = await requestPermission.call(window.DeviceMotionEvent);
         if (permission !== 'granted') {
           this.#emitStatus('Motion permission was not granted.', 'error');
           return false;
@@ -44,9 +46,9 @@ export class MotionController extends EventTarget {
 
       window.removeEventListener('devicemotion', this.#boundMotionHandler);
       window.addEventListener('devicemotion', this.#boundMotionHandler, { passive: true });
-      this.#isEnabled = true;
+      this.#enabled = true;
       this.rearm();
-      this.#emitStatus('Motion enabled. Flick the phone to snap the cube.', 'ready');
+      this.#emitStatus('Motion enabled', 'ready');
       return true;
     } catch (error) {
       this.#emitStatus(`Motion permission failed: ${error.message}`, 'error');
@@ -54,77 +56,82 @@ export class MotionController extends EventTarget {
     }
   }
 
-  disable() {
-    window.removeEventListener('devicemotion', this.#boundMotionHandler);
-    this.#isEnabled = false;
-    this.#emitStatus('Motion disabled.', 'idle');
-  }
-
   rearm() {
     this.#cooldownUntil = 0;
     this.#waitingForNeutral = false;
     this.#stableSince = performance.now();
-    this.dispatchEvent(new CustomEvent('armed-state', { detail: { label: 'Armed' } }));
+    this.#emitArmedState('Armed');
+  }
+
+  detectManualVector(vector) {
+    return selectProjectedAxis(vector, this.#getProjectedAxes(), this.#settings);
   }
 
   #handleMotion(event) {
     const now = performance.now();
     const raw = normalizeRotationRate(event.rotationRate);
     this.#smoothedRaw = smoothRates(this.#smoothedRaw, raw, this.#settings.smoothing);
-    const mapped = mapRates(this.#smoothedRaw, this.#settings.axisMap);
+    const screen = mapRawToScreen(this.#smoothedRaw, this.#settings.sensorMap);
+    const speed = length2(screen);
 
     this.dispatchEvent(
       new CustomEvent('telemetry', {
         detail: {
           raw: this.#smoothedRaw,
-          mapped,
+          screen,
+          speed,
+          projectedAxes: this.#getProjectedAxes(),
         },
       }),
     );
 
-    if (!this.#isEnabled) return;
-    if (this.#settings.ignoreWhileTouching && this.#isTouchActive) {
-      this.dispatchEvent(new CustomEvent('armed-state', { detail: { label: 'Touch lock' } }));
+    if (!this.#enabled) return;
+
+    if (this.#settings.ignoreWhileTouching && this.#touchActive) {
+      this.#emitArmedState('Touch lock');
       return;
     }
 
-    const maxRawRate = Math.max(...Object.values(mapped).map(Math.abs));
-    if (maxRawRate < this.#settings.neutralThreshold) {
+    if (speed < this.#settings.neutralThreshold) {
       if (this.#waitingForNeutral && now - this.#stableSince >= this.#settings.neutralDurationMs) {
         this.#waitingForNeutral = false;
       }
-      this.dispatchEvent(new CustomEvent('armed-state', { detail: { label: 'Armed' } }));
+      this.#emitArmedState('Armed');
     } else if (!this.#waitingForNeutral) {
       this.#stableSince = now;
     }
 
     if (now < this.#cooldownUntil) {
-      this.dispatchEvent(new CustomEvent('armed-state', { detail: { label: 'Cooldown' } }));
+      this.#emitArmedState('Cooldown');
       return;
     }
 
     if (this.#settings.requireNeutral && this.#waitingForNeutral) {
-      this.dispatchEvent(new CustomEvent('armed-state', { detail: { label: 'Return to neutral' } }));
+      this.#emitArmedState('Return to neutral');
       return;
     }
 
-    const candidate = detectFlick(mapped, this.#settings);
-    if (!candidate) return;
+    const flick = selectProjectedAxis(screen, this.#getProjectedAxes(), this.#settings);
+    if (!flick) return;
 
     this.#cooldownUntil = now + this.#settings.cooldownMs;
     this.#waitingForNeutral = this.#settings.requireNeutral;
     this.#stableSince = now;
 
-    this.dispatchEvent(new CustomEvent('flick', { detail: candidate }));
+    this.dispatchEvent(new CustomEvent('flick', { detail: flick }));
   }
 
   #emitStatus(message, tone) {
     this.dispatchEvent(new CustomEvent('status', { detail: { message, tone } }));
   }
+
+  #emitArmedState(label) {
+    this.dispatchEvent(new CustomEvent('armed-state', { detail: { label } }));
+  }
 }
 
 function normalizeRotationRate(rotationRate) {
-  if (!rotationRate) return { ...ZERO_RATES };
+  if (!rotationRate) return { ...ZERO_RAW };
 
   return {
     alpha: finiteNumber(rotationRate.alpha),
@@ -149,29 +156,9 @@ function smoothRates(previous, next, smoothing) {
   };
 }
 
-function mapRates(raw, axisMap) {
-  return CUBE_AXES.reduce((rates, axis) => {
-    const row = axisMap[axis];
-    rates[axis] = raw[row.source] * row.sign;
-    return rates;
-  }, {});
-}
-
-function detectFlick(mappedRates, settings) {
-  const dominant = absMax(mappedRates);
-  const dominantSpeed = Math.abs(dominant.value);
-
-  if (dominantSpeed < settings.velocityThreshold) return null;
-
-  const runnerUp = secondLargestAbs(mappedRates, dominant.axis);
-  const ratio = dominantSpeed / Math.max(runnerUp, 1);
-  if (ratio < settings.dominanceRatio) return null;
-
+function mapRawToScreen(raw, sensorMap) {
   return {
-    axis: dominant.axis,
-    direction: Math.sign(dominant.value) || 1,
-    speed: dominantSpeed,
-    ratio,
-    rates: mappedRates,
+    x: raw[sensorMap.screenX.source] * sensorMap.screenX.sign,
+    y: raw[sensorMap.screenY.source] * sensorMap.screenY.sign,
   };
 }

@@ -20,6 +20,23 @@ It is designed for the exact early-stage UX question: can a mobile user hold the
 - LocalStorage persistence for settings
 - No build step, no dependencies, GitHub Pages ready
 
+### New Version
+
+- Fullscreen landscape cube scene.
+- Portrait mode is blocked with a rotate-your-phone overlay.
+- Floating controls only:
+  - Settings in the top-left corner.
+  - Motion permission in the top center.
+  - Logs in the top-right corner.
+  - Manual projected flick buttons at the bottom.
+- A CSS 3D cube rendered without applying `filter: drop-shadow()` to the cube itself, preserving depth.
+- Fixed isometric camera angle so the cube always shows three faces equally.
+- Orientation-relative snaps:
+  - A flick is treated as a 2D vector across the landscape screen.
+  - The app projects the cube's current local X/Y/Z axes into screen space.
+  - The nearest projected axis receives the snap.
+  - The snap is applied around the cube's current local axis, not the original world axis.
+
 ## iPhone testing notes
 
 On iOS Safari, the app must ask for motion permission from a user gesture. Press **Enable motion** after opening the page.
@@ -32,39 +49,37 @@ For best testing:
 - Return the phone to neutral after each flick.
 - If an axis feels inverted or wrong, open **Settings** and adjust only that axis first.
 
-## Default mapping
+## Tuning guide
 
-| Cube axis | Sensor source | Default meaning |
-| --- | --- | --- |
-| X | `beta` | pitch-style motion |
-| Y | `gamma` | side/twist-style motion |
-| Z | `alpha` | roll/spin-style motion |
+Start with the defaults, then tune on a real iPhone:
 
-Different browsers and device orientations may feel slightly different. The app includes axis remapping so you can tune the feel on the real phone.
+- **Planar flick threshold**: how fast the landscape-screen flick vector must be.
+- **Projection confidence**: how closely the flick must match one of the cube's projected axes.
+- **Cooldown**: prevents accidental double-snaps.
+- **Neutral threshold**: how still the phone must be before re-arming.
+- **Neutral duration**: how long it must remain still before re-arming.
+- **Smoothing**: reduces noisy sensor spikes but adds latency.
 
-## Suggested first experiment
-
-Start with the default settings and test these questions:
-
-1. Can you trigger X, Y, and Z intentionally?
-2. Does the cube snap exactly once per flick?
-3. Does returning to neutral accidentally trigger the opposite direction?
-4. Does increasing the dominance ratio reduce wrong-axis snaps?
-5. Does increasing cooldown reduce double-rotations?
+If the motion feels rotated or inverted, use the **Landscape sensor mapping** section in Settings.
 
 ## Architecture
 
 ```text
-.
-├── index.html
-├── styles/
-│   └── main.css
-└── src/
-    ├── app.js               # App wiring and UI rendering
-    ├── config.js            # Defaults and constants
-    ├── cube-view.js         # 3D cube state and snap rendering
-    ├── motion-controller.js # DeviceMotion permission + flick detection
-    ├── settings-panel.js    # Settings dialog and persistence integration
-    ├── storage.js           # Settings validation and LocalStorage
-    └── utils.js             # Small formatting/math helpers
+index.html
+styles/main.css
+src/
+  app.js
+  config.js
+  core/
+    cube-orientation.js   # cube-local orientation matrix and CSS matrix output
+    flick-detector.js     # screen-vector to current projected cube-axis selection
+    matrix3.js            # small 3D matrix helper, no dependency
+    motion-controller.js  # DeviceMotion permission, smoothing, cooldown, neutral logic
+    storage.js            # LocalStorage settings persistence
+    vector.js             # small 2D vector helpers
+    format.js             # formatting and escaping helpers
+  ui/
+    axis-guide.js         # visual projected-axis guide lines
+    log-panel.js          # telemetry and gesture log dialog
+    settings-panel.js     # settings dialog and persistence
 ```

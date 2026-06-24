@@ -3,164 +3,106 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b1020" />
+    <meta name="theme-color" content="#050816" />
     <meta
       name="description"
-      content="A polished mobile web lab for testing gyro flick gestures that snap a 3D cube by 90 degrees."
+      content="A landscape-first mobile web lab for testing orientation-relative gyro flicks on a 3D cube."
     />
     <title>Gyro Cube Flick Lab</title>
     <link rel="stylesheet" href="styles/main.css" />
   </head>
   <body>
-    <main class="app-shell">
-      <section class="hero-panel" aria-labelledby="app-title">
-        <div class="hero-copy">
-          <p class="eyebrow">Motion UX Prototype</p>
-          <h1 id="app-title">Gyro Cube Flick Lab</h1>
-          <p class="hero-text">
-            Test quick phone flicks that snap a 3D cube by 90°. Built for iPhone Safari,
-            GitHub Pages, and fast threshold tuning.
-          </p>
+    <div class="rotate-device-overlay" aria-live="polite">
+      <div class="rotate-card">
+        <div class="phone-icon" aria-hidden="true"></div>
+        <h1>Rotate to landscape</h1>
+        <p>This lab is designed for two-hand horizontal phone flicks.</p>
+      </div>
+    </div>
+
+    <main class="app" aria-label="Gyro cube flick tester">
+      <section id="scene" class="scene" aria-label="Fullscreen 3D cube scene">
+        <div class="scene-gradient" aria-hidden="true"></div>
+        <div class="scene-grid" aria-hidden="true"></div>
+        <div id="axisGuide" class="axis-guide" aria-hidden="true">
+          <span class="axis-line axis-line-x"><b>X</b></span>
+          <span class="axis-line axis-line-y"><b>Y</b></span>
+          <span class="axis-line axis-line-z"><b>Z</b></span>
         </div>
 
-        <div class="hero-actions" aria-label="Primary actions">
-          <button id="enableMotionButton" class="button button-primary" type="button">
-            Enable motion
-          </button>
-          <button id="openSettingsButton" class="button button-secondary" type="button">
-            Settings
-          </button>
-          <button id="resetCubeButton" class="button button-ghost" type="button">
-            Reset cube
-          </button>
+        <div class="cube-shadow" aria-hidden="true"></div>
+        <div class="cube-shell" aria-hidden="true">
+          <div id="cube" class="cube">
+            <div class="cube-face cube-face-front" data-face="F">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="cube-face cube-face-back" data-face="B">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="cube-face cube-face-right" data-face="R">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="cube-face cube-face-left" data-face="L">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="cube-face cube-face-top" data-face="U">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+            <div class="cube-face cube-face-bottom" data-face="D">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
+          </div>
         </div>
-      </section>
 
-      <section class="workspace" aria-label="Cube flick tester">
-        <article class="cube-card">
-          <div class="status-strip" aria-live="polite">
-            <span id="motionStatus" class="status-pill status-idle">Motion disabled</span>
-            <span id="armedStatus" class="status-pill">Waiting</span>
-            <span id="lastFlickStatus" class="status-pill">Last flick: —</span>
+        <div class="top-bar" aria-label="Floating scene controls">
+          <div class="corner-stack corner-stack-left">
+            <button id="settingsButton" class="glass-button" type="button" aria-haspopup="dialog">Settings</button>
+            <button id="resetButton" class="glass-button glass-button-subtle" type="button">Reset</button>
           </div>
 
-          <div id="cubeStage" class="cube-stage" aria-label="Interactive 3D cube display">
-            <div class="orientation-rings" aria-hidden="true">
-              <span></span>
-              <span></span>
-            </div>
+          <button id="enableMotionButton" class="motion-button" type="button">Enable motion</button>
 
-            <div id="cube" class="cube" aria-hidden="true">
-              <div class="cube-face cube-face-front"><span>FRONT</span></div>
-              <div class="cube-face cube-face-back"><span>BACK</span></div>
-              <div class="cube-face cube-face-right"><span>RIGHT</span></div>
-              <div class="cube-face cube-face-left"><span>LEFT</span></div>
-              <div class="cube-face cube-face-top"><span>TOP</span></div>
-              <div class="cube-face cube-face-bottom"><span>BOTTOM</span></div>
-            </div>
+          <div class="corner-stack corner-stack-right">
+            <button id="logsButton" class="glass-button" type="button" aria-haspopup="dialog">Logs</button>
           </div>
+        </div>
 
-          <div class="manual-controls" aria-label="Manual snap controls for desktop testing">
-            <button class="mini-button" data-manual-flick="x:-1" type="button">X−</button>
-            <button class="mini-button" data-manual-flick="x:1" type="button">X+</button>
-            <button class="mini-button" data-manual-flick="y:-1" type="button">Y−</button>
-            <button class="mini-button" data-manual-flick="y:1" type="button">Y+</button>
-            <button class="mini-button" data-manual-flick="z:-1" type="button">Z−</button>
-            <button class="mini-button" data-manual-flick="z:1" type="button">Z+</button>
-          </div>
-        </article>
+        <div class="status-strip" aria-live="polite">
+          <span id="motionStatus">Motion disabled</span>
+          <span id="armedStatus">Waiting</span>
+          <span id="lastMoveStatus">Last snap: —</span>
+        </div>
 
-        <aside class="inspector-card" aria-label="Live motion inspector">
-          <div class="card-header">
-            <div>
-              <p class="eyebrow">Live telemetry</p>
-              <h2>Rotation rate</h2>
-            </div>
-            <button id="calibrateButton" class="mini-button" type="button">Re-arm</button>
-          </div>
-
-          <div class="telemetry-grid">
-            <div class="metric-card">
-              <span class="metric-label">Cube X</span>
-              <strong id="rateX">0</strong>
-              <span class="metric-unit">deg/s</span>
-              <div class="meter"><span id="meterX"></span></div>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Cube Y</span>
-              <strong id="rateY">0</strong>
-              <span class="metric-unit">deg/s</span>
-              <div class="meter"><span id="meterY"></span></div>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Cube Z</span>
-              <strong id="rateZ">0</strong>
-              <span class="metric-unit">deg/s</span>
-              <div class="meter"><span id="meterZ"></span></div>
-            </div>
-          </div>
-
-          <div class="raw-panel">
-            <h3>Raw sensor axes</h3>
-            <dl>
-              <div><dt>alpha</dt><dd id="rawAlpha">0</dd></div>
-              <div><dt>beta</dt><dd id="rawBeta">0</dd></div>
-              <div><dt>gamma</dt><dd id="rawGamma">0</dd></div>
-            </dl>
-          </div>
-
-          <div class="event-log-panel">
-            <h3>Gesture log</h3>
-            <ol id="eventLog" class="event-log">
-              <li>No flicks yet. Enable motion and try a short, confident snap.</li>
-            </ol>
-          </div>
-        </aside>
-      </section>
-
-      <section class="guide-grid" aria-label="Gesture guide">
-        <article class="guide-card">
-          <h2>How to test</h2>
-          <p>
-            Hold the phone in landscape, press <strong>Enable motion</strong>, then make a quick
-            rotational flick and return to neutral. The cube should snap exactly once.
-          </p>
-        </article>
-        <article class="guide-card">
-          <h2>Target behavior</h2>
-          <p>
-            Phone pitch maps to X, push-pull twist maps to Y, and roll maps to Z. If your phone
-            feels inverted, open Settings and flip that axis.
-          </p>
-        </article>
-        <article class="guide-card">
-          <h2>Design rule</h2>
-          <p>
-            Flicks are ignored while touching the cube area.
-          </p>
-        </article>
+        <div class="manual-dock" aria-label="Manual projected flick controls">
+          <button class="manual-button" data-manual-vector="-1,-1" type="button" aria-label="Manual flick northwest">↖</button>
+          <button class="manual-button" data-manual-vector="0,-1" type="button" aria-label="Manual flick up">↑</button>
+          <button class="manual-button" data-manual-vector="1,-1" type="button" aria-label="Manual flick northeast">↗</button>
+          <button class="manual-button" data-manual-vector="-1,1" type="button" aria-label="Manual flick southwest">↙</button>
+          <button class="manual-button" data-manual-vector="0,1" type="button" aria-label="Manual flick down">↓</button>
+          <button class="manual-button" data-manual-vector="1,1" type="button" aria-label="Manual flick southeast">↘</button>
+        </div>
       </section>
     </main>
 
-    <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsTitle">
-      <form id="settingsForm" method="dialog" class="settings-panel">
-        <header class="settings-header">
+    <dialog id="settingsDialog" class="dialog settings-dialog" aria-labelledby="settingsTitle">
+      <form id="settingsForm" method="dialog" class="dialog-panel settings-panel">
+        <header class="dialog-header">
           <div>
-            <p class="eyebrow">Tuning lab</p>
-            <h2 id="settingsTitle">Motion settings</h2>
+            <p class="eyebrow">Landscape motion lab</p>
+            <h2 id="settingsTitle">Flick settings</h2>
           </div>
           <button class="icon-button" value="close" aria-label="Close settings" type="submit">×</button>
         </header>
 
-        <div class="settings-section">
+        <section class="settings-grid" aria-label="Gesture thresholds">
           <label class="range-setting">
-            <span>Flick threshold <output id="thresholdOutput"></output></span>
-            <input id="thresholdInput" name="velocityThreshold" type="range" min="120" max="900" step="10" />
+            <span>Planar flick threshold <output id="planarThresholdOutput"></output></span>
+            <input id="planarThresholdInput" name="planarThreshold" type="range" min="80" max="900" step="10" />
           </label>
 
           <label class="range-setting">
-            <span>Dominance ratio <output id="dominanceOutput"></output></span>
-            <input id="dominanceInput" name="dominanceRatio" type="range" min="1.1" max="4" step="0.1" />
+            <span>Projection confidence <output id="projectionConfidenceOutput"></output></span>
+            <input id="projectionConfidenceInput" name="projectionConfidence" type="range" min="0.55" max="0.98" step="0.01" />
           </label>
 
           <label class="range-setting">
@@ -170,7 +112,7 @@
 
           <label class="range-setting">
             <span>Neutral threshold <output id="neutralThresholdOutput"></output></span>
-            <input id="neutralThresholdInput" name="neutralThreshold" type="range" min="15" max="180" step="5" />
+            <input id="neutralThresholdInput" name="neutralThreshold" type="range" min="10" max="180" step="5" />
           </label>
 
           <label class="range-setting">
@@ -182,63 +124,93 @@
             <span>Smoothing <output id="smoothingOutput"></output></span>
             <input id="smoothingInput" name="smoothing" type="range" min="0" max="0.85" step="0.05" />
           </label>
-        </div>
+        </section>
 
-        <div class="settings-section settings-checks">
+        <section class="settings-checks" aria-label="Gesture behavior toggles">
           <label><input id="requireNeutralInput" name="requireNeutral" type="checkbox" /> Require return to neutral</label>
-          <label><input id="ignoreTouchInput" name="ignoreWhileTouching" type="checkbox" /> Ignore flicks while touching cube</label>
+          <label><input id="ignoreTouchInput" name="ignoreWhileTouching" type="checkbox" /> Ignore flicks while touching screen</label>
           <label><input id="vibrationInput" name="vibrationEnabled" type="checkbox" /> Haptic vibration on snap</label>
-        </div>
+        </section>
 
-        <div class="settings-section axis-settings" aria-label="Axis mapping">
-          <h3>Axis mapping</h3>
-          <p>
-            Keep these defaults first. If a gesture rotates the wrong cube axis or direction,
-            remap or invert only that row.
-          </p>
-          <div class="axis-row">
-            <span>Cube X</span>
-            <select id="axisXSource" name="axisXSource">
-              <option value="alpha">alpha</option>
-              <option value="beta">beta</option>
-              <option value="gamma">gamma</option>
-            </select>
-            <select id="axisXSign" name="axisXSign">
-              <option value="1">normal</option>
-              <option value="-1">inverted</option>
-            </select>
+        <section class="axis-settings" aria-label="Landscape sensor mapping">
+          <div class="section-copy">
+            <h3>Landscape sensor mapping</h3>
+            <p>
+              The detector reads your phone as a 2D flick vector, then projects that vector onto the
+              cube’s current visible diagonal axes. If your iPhone feels inverted, flip only the row
+              that feels wrong.
+            </p>
           </div>
-          <div class="axis-row">
-            <span>Cube Y</span>
-            <select id="axisYSource" name="axisYSource">
-              <option value="alpha">alpha</option>
-              <option value="beta">beta</option>
-              <option value="gamma">gamma</option>
-            </select>
-            <select id="axisYSign" name="axisYSign">
-              <option value="1">normal</option>
-              <option value="-1">inverted</option>
-            </select>
-          </div>
-          <div class="axis-row">
-            <span>Cube Z</span>
-            <select id="axisZSource" name="axisZSource">
-              <option value="alpha">alpha</option>
-              <option value="beta">beta</option>
-              <option value="gamma">gamma</option>
-            </select>
-            <select id="axisZSign" name="axisZSign">
-              <option value="1">normal</option>
-              <option value="-1">inverted</option>
-            </select>
-          </div>
-        </div>
 
-        <footer class="settings-footer">
-          <button id="resetSettingsButton" class="button button-ghost" type="button">Reset defaults</button>
-          <button class="button button-primary" value="close" type="submit">Done</button>
+          <div class="axis-row">
+            <span>Screen X</span>
+            <select id="screenXSource" name="screenXSource">
+              <option value="alpha">alpha</option>
+              <option value="beta">beta</option>
+              <option value="gamma">gamma</option>
+            </select>
+            <select id="screenXSign" name="screenXSign">
+              <option value="1">normal</option>
+              <option value="-1">inverted</option>
+            </select>
+          </div>
+
+          <div class="axis-row">
+            <span>Screen Y</span>
+            <select id="screenYSource" name="screenYSource">
+              <option value="alpha">alpha</option>
+              <option value="beta">beta</option>
+              <option value="gamma">gamma</option>
+            </select>
+            <select id="screenYSign" name="screenYSign">
+              <option value="1">normal</option>
+              <option value="-1">inverted</option>
+            </select>
+          </div>
+        </section>
+
+        <footer class="dialog-footer">
+          <button id="resetSettingsButton" class="button-secondary" type="button">Reset settings</button>
+          <button class="button-primary" value="close" type="submit">Done</button>
         </footer>
       </form>
+    </dialog>
+
+    <dialog id="logsDialog" class="dialog logs-dialog" aria-labelledby="logsTitle">
+      <section class="dialog-panel logs-panel">
+        <header class="dialog-header">
+          <div>
+            <p class="eyebrow">Live debug</p>
+            <h2 id="logsTitle">Motion logs</h2>
+          </div>
+          <button id="closeLogsButton" class="icon-button" aria-label="Close logs" type="button">×</button>
+        </header>
+
+        <div class="telemetry-grid" aria-label="Live telemetry">
+          <article class="metric-card">
+            <span>Raw alpha</span><strong id="rawAlpha">0</strong><em>deg/s</em>
+          </article>
+          <article class="metric-card">
+            <span>Raw beta</span><strong id="rawBeta">0</strong><em>deg/s</em>
+          </article>
+          <article class="metric-card">
+            <span>Raw gamma</span><strong id="rawGamma">0</strong><em>deg/s</em>
+          </article>
+          <article class="metric-card">
+            <span>Screen X</span><strong id="screenRateX">0</strong><em>deg/s</em>
+          </article>
+          <article class="metric-card">
+            <span>Screen Y</span><strong id="screenRateY">0</strong><em>deg/s</em>
+          </article>
+          <article class="metric-card">
+            <span>Vector speed</span><strong id="planarSpeed">0</strong><em>deg/s</em>
+          </article>
+        </div>
+
+        <ol id="eventLog" class="event-log">
+          <li>No events yet. Enable motion and flick the phone in landscape.</li>
+        </ol>
+      </section>
     </dialog>
 
     <script type="module" src="src/app.js"></script>
