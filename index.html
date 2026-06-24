@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#050816" />
     <meta
       name="description"
-      content="A landscape-first mobile web lab for testing orientation-relative gyro flicks on a 3D cube."
+      content="A landscape-first mobile web lab for testing container-axis gyro flicks on a 3D cube."
     />
     <title>Gyro Cube Flick Lab</title>
     <link rel="stylesheet" href="styles/main.css" />
@@ -73,13 +73,13 @@
           <span id="lastMoveStatus">Last snap: —</span>
         </div>
 
-        <div class="manual-dock" aria-label="Manual projected flick controls">
-          <button class="manual-button" data-manual-vector="-1,-1" type="button" aria-label="Manual flick northwest">↖</button>
-          <button class="manual-button" data-manual-vector="0,-1" type="button" aria-label="Manual flick up">↑</button>
-          <button class="manual-button" data-manual-vector="1,-1" type="button" aria-label="Manual flick northeast">↗</button>
-          <button class="manual-button" data-manual-vector="-1,1" type="button" aria-label="Manual flick southwest">↙</button>
-          <button class="manual-button" data-manual-vector="0,1" type="button" aria-label="Manual flick down">↓</button>
-          <button class="manual-button" data-manual-vector="1,1" type="button" aria-label="Manual flick southeast">↘</button>
+        <div class="manual-dock" aria-label="Manual cube-axis snap controls">
+          <button class="manual-button" data-manual-axis="x" data-manual-direction="-1" type="button" aria-label="Manual X negative snap">X−</button>
+          <button class="manual-button" data-manual-axis="x" data-manual-direction="1" type="button" aria-label="Manual X positive snap">X+</button>
+          <button class="manual-button" data-manual-axis="y" data-manual-direction="-1" type="button" aria-label="Manual Y negative snap">Y−</button>
+          <button class="manual-button" data-manual-axis="y" data-manual-direction="1" type="button" aria-label="Manual Y positive snap">Y+</button>
+          <button class="manual-button" data-manual-axis="z" data-manual-direction="-1" type="button" aria-label="Manual Z negative snap">Z−</button>
+          <button class="manual-button" data-manual-axis="z" data-manual-direction="1" type="button" aria-label="Manual Z positive snap">Z+</button>
         </div>
       </section>
     </main>
@@ -88,7 +88,7 @@
       <form id="settingsForm" method="dialog" class="dialog-panel settings-panel">
         <header class="dialog-header">
           <div>
-            <p class="eyebrow">Landscape motion lab</p>
+            <p class="eyebrow">Container-axis motion lab</p>
             <h2 id="settingsTitle">Flick settings</h2>
           </div>
           <button class="icon-button" value="close" aria-label="Close settings" type="submit">×</button>
@@ -96,18 +96,18 @@
 
         <section class="settings-grid" aria-label="Gesture thresholds">
           <label class="range-setting">
-            <span>Planar flick threshold <output id="planarThresholdOutput"></output></span>
-            <input id="planarThresholdInput" name="planarThreshold" type="range" min="80" max="900" step="10" />
+            <span>3D spin threshold <output id="spinThresholdOutput"></output></span>
+            <input id="spinThresholdInput" name="spinThreshold" type="range" min="80" max="900" step="10" />
           </label>
 
           <label class="range-setting">
-            <span>Projection confidence <output id="projectionConfidenceOutput"></output></span>
-            <input id="projectionConfidenceInput" name="projectionConfidence" type="range" min="0.55" max="0.98" step="0.01" />
+            <span>Axis confidence <output id="axisConfidenceOutput"></output></span>
+            <input id="axisConfidenceInput" name="axisConfidence" type="range" min="0.55" max="0.98" step="0.01" />
           </label>
 
           <label class="range-setting">
             <span>Cooldown <output id="cooldownOutput"></output></span>
-            <input id="cooldownInput" name="cooldownMs" type="range" min="100" max="1200" step="25" />
+            <input id="cooldownMsInput" name="cooldownMs" type="range" min="100" max="1200" step="25" />
           </label>
 
           <label class="range-setting">
@@ -117,7 +117,7 @@
 
           <label class="range-setting">
             <span>Neutral duration <output id="neutralDurationOutput"></output></span>
-            <input id="neutralDurationInput" name="neutralDurationMs" type="range" min="0" max="700" step="25" />
+            <input id="neutralDurationMsInput" name="neutralDurationMs" type="range" min="0" max="700" step="25" />
           </label>
 
           <label class="range-setting">
@@ -132,37 +132,51 @@
           <label><input id="vibrationInput" name="vibrationEnabled" type="checkbox" /> Haptic vibration on snap</label>
         </section>
 
-        <section class="axis-settings" aria-label="Landscape sensor mapping">
+        <section class="axis-settings" aria-label="Container sensor mapping">
           <div class="section-copy">
-            <h3>Landscape sensor mapping</h3>
+            <h3>Container sensor mapping</h3>
             <p>
-              The detector reads your phone as a 2D flick vector, then projects that vector onto the
-              cube’s current visible diagonal axes. If your iPhone feels inverted, flip only the row
-              that feels wrong.
+              The phone is treated as the container that holds the cube. The detector builds a 3D
+              spin vector from the phone sensors, then matches that vector against the cube’s
+              current visible local X/Y/Z axes. If a physical direction feels reversed, flip that
+              container axis.
             </p>
           </div>
 
           <div class="axis-row">
-            <span>Screen X</span>
-            <select id="screenXSource" name="screenXSource">
+            <span>Container X</span>
+            <select id="containerXSource" name="containerXSource">
               <option value="alpha">alpha</option>
               <option value="beta">beta</option>
               <option value="gamma">gamma</option>
             </select>
-            <select id="screenXSign" name="screenXSign">
+            <select id="containerXSign" name="containerXSign">
               <option value="1">normal</option>
               <option value="-1">inverted</option>
             </select>
           </div>
 
           <div class="axis-row">
-            <span>Screen Y</span>
-            <select id="screenYSource" name="screenYSource">
+            <span>Container Y</span>
+            <select id="containerYSource" name="containerYSource">
               <option value="alpha">alpha</option>
               <option value="beta">beta</option>
               <option value="gamma">gamma</option>
             </select>
-            <select id="screenYSign" name="screenYSign">
+            <select id="containerYSign" name="containerYSign">
+              <option value="1">normal</option>
+              <option value="-1">inverted</option>
+            </select>
+          </div>
+
+          <div class="axis-row">
+            <span>Container Z</span>
+            <select id="containerZSource" name="containerZSource">
+              <option value="alpha">alpha</option>
+              <option value="beta">beta</option>
+              <option value="gamma">gamma</option>
+            </select>
+            <select id="containerZSign" name="containerZSign">
               <option value="1">normal</option>
               <option value="-1">inverted</option>
             </select>
@@ -197,18 +211,21 @@
             <span>Raw gamma</span><strong id="rawGamma">0</strong><em>deg/s</em>
           </article>
           <article class="metric-card">
-            <span>Screen X</span><strong id="screenRateX">0</strong><em>deg/s</em>
+            <span>Container X</span><strong id="containerRateX">0</strong><em>deg/s</em>
           </article>
           <article class="metric-card">
-            <span>Screen Y</span><strong id="screenRateY">0</strong><em>deg/s</em>
+            <span>Container Y</span><strong id="containerRateY">0</strong><em>deg/s</em>
           </article>
           <article class="metric-card">
-            <span>Vector speed</span><strong id="planarSpeed">0</strong><em>deg/s</em>
+            <span>Container Z</span><strong id="containerRateZ">0</strong><em>deg/s</em>
+          </article>
+          <article class="metric-card">
+            <span>3D spin speed</span><strong id="spinSpeed">0</strong><em>deg/s</em>
           </article>
         </div>
 
         <ol id="eventLog" class="event-log">
-          <li>No events yet. Enable motion and flick the phone in landscape.</li>
+          <li>No events yet. Enable motion and rotate the phone around one of the cube axes.</li>
         </ol>
       </section>
     </dialog>
