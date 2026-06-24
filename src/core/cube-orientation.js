@@ -1,4 +1,4 @@
-import { angleFromVector, normalize2 } from './vector.js';
+import { angleFromVector, normalize2, normalize3 } from './vector.js';
 import { cleanMatrix, identity3, multiply3, rotationMatrix, toCssMatrix3d, transformVector3 } from './matrix3.js';
 
 const SNAP_DEGREES = 90;
@@ -26,7 +26,8 @@ export class CubeOrientation extends EventTarget {
     const normalizedDirection = Math.sign(direction) || 1;
     const localRotation = rotationMatrix(axis, SNAP_DEGREES * normalizedDirection);
 
-    // Post-multiply: the snap happens around the cube's current local axis, not the original world axis.
+    // Post-multiply: the snap happens around the cube's current local axis,
+    // so the next flick is based on the cube as it is currently held.
     this.#orientation = cleanMatrix(multiply3(this.#orientation, localRotation));
     this.#moveCount += 1;
     this.render();
@@ -70,13 +71,20 @@ export class CubeOrientation extends EventTarget {
 
     return Object.entries(LOCAL_AXES).reduce((axes, [axis, vector]) => {
       const transformed = transformVector3(matrix, vector);
-      const screen = normalize2({ x: transformed.x, y: -transformed.y });
+      const motion = normalize3({
+        x: transformed.x,
+        y: -transformed.y,
+        z: transformed.z,
+      });
+      const screen = normalize2({ x: motion.x, y: motion.y });
 
       axes[axis] = {
         axis,
+        motion,
+        container: motion,
         screen,
         angle: angleFromVector(screen),
-        depth: transformed.z,
+        depth: motion.z,
       };
       return axes;
     }, {});
