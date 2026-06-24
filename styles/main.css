@@ -301,6 +301,7 @@ button {
 }
 
 .motion-button {
+  pointer-events: auto;
   border-color: rgba(125, 211, 252, 0.42);
   background:
     linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(20, 184, 166, 0.18)),
