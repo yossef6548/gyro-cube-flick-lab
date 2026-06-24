@@ -37,7 +37,7 @@ export class CubeOrientation extends EventTarget {
       direction: normalizedDirection,
       label: `${axis.toUpperCase()}${normalizedDirection > 0 ? '+' : '−'}`,
       moveCount: this.#moveCount,
-      projectedAxes: this.getProjectedAxes(),
+      cubeAxes: this.getCubeAxes(),
     };
 
     this.dispatchEvent(new CustomEvent('change', { detail: move }));
@@ -55,7 +55,7 @@ export class CubeOrientation extends EventTarget {
           direction: 0,
           label: 'Reset',
           moveCount: this.#moveCount,
-          projectedAxes: this.getProjectedAxes(),
+          cubeAxes: this.getCubeAxes(),
         },
       }),
     );
@@ -66,11 +66,15 @@ export class CubeOrientation extends EventTarget {
     this.#cubeElement.style.transform = toCssMatrix3d(viewOrientation);
   }
 
-  getProjectedAxes() {
+  getCubeAxes() {
     const matrix = multiply3(VIEW_MATRIX, this.#orientation);
 
     return Object.entries(LOCAL_AXES).reduce((axes, [axis, vector]) => {
       const transformed = transformVector3(matrix, vector);
+
+      // Container coordinates are defined as: X right on the landscape screen,
+      // Y up on the landscape screen, Z toward the user. CSS screen Y points down,
+      // so the visual Y component is inverted before matching phone angular velocity.
       const motion = normalize3({
         x: transformed.x,
         y: -transformed.y,
@@ -81,7 +85,6 @@ export class CubeOrientation extends EventTarget {
       axes[axis] = {
         axis,
         motion,
-        container: motion,
         screen,
         angle: angleFromVector(screen),
         depth: motion.z,
