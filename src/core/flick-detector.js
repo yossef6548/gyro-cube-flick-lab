@@ -5,16 +5,21 @@ export function selectContainerAxis(containerAngularVelocity, cubeAxes, settings
   if (speed < settings.spinThreshold) return null;
 
   const normalizedVelocity = normalize3(containerAngularVelocity);
-  const directionSign = settings.snapDirectionSign ?? 1;
+  const axisDirectionSigns = settings.axisDirectionSigns ?? {};
 
   const candidates = Object.values(cubeAxes)
     .map((axis) => {
       const motionAxis = normalize3(axis.motion);
       const signedScore = dot3(normalizedVelocity, motionAxis);
+      const axisDirectionSign = axisDirectionSigns[axis.axis] ?? 1;
 
       return {
         axis: axis.axis,
-        direction: (Math.sign(signedScore) || 1) * directionSign,
+        // Axis selection and direction correction are intentionally separate.
+        // Inverting a sensor input axis changes the 3D vector before selection
+        // and can accidentally match another axis. Inverting a cube axis here
+        // only reverses the final snap direction after the best axis is known.
+        direction: (Math.sign(signedScore) || 1) * axisDirectionSign,
         score: Math.abs(signedScore),
         signedScore,
         speed,

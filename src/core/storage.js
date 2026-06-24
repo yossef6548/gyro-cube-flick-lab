@@ -24,6 +24,10 @@ function mergeSettings(defaults, stored) {
     ...structuredClone(defaults),
     ...stored,
     sensorMap: mergeSensorMap(defaults.sensorMap, stored?.sensorMap),
+    axisDirectionSigns: {
+      ...defaults.axisDirectionSigns,
+      ...(stored?.axisDirectionSigns ?? {}),
+    },
   };
 }
 

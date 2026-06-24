@@ -2,7 +2,6 @@ import { selectContainerAxis } from './flick-detector.js';
 import { length3 } from './vector.js';
 
 const ZERO_RAW = Object.freeze({ alpha: 0, beta: 0, gamma: 0 });
-const ZERO_VECTOR = Object.freeze({ x: 0, y: 0, z: 0 });
 
 export class MotionController extends EventTarget {
   #settings;
@@ -64,15 +63,18 @@ export class MotionController extends EventTarget {
     this.#emitArmedState('Armed');
   }
 
-  detectManualSnap(axis, direction) {
-    return {
-      axis,
-      direction: Math.sign(direction) || 1,
-      confidence: 1,
-      speed: 0,
-      containerVector: { ...ZERO_VECTOR },
-      runnerUpConfidence: 0,
+  detectManualFlick(axis, physicalDirection) {
+    const cubeAxis = this.#getCubeAxes()[axis];
+    if (!cubeAxis) return null;
+
+    const speed = Math.max(this.#settings.spinThreshold + 1, 300);
+    const vector = {
+      x: cubeAxis.motion.x * physicalDirection * speed,
+      y: cubeAxis.motion.y * physicalDirection * speed,
+      z: cubeAxis.motion.z * physicalDirection * speed,
     };
+
+    return selectContainerAxis(vector, this.#getCubeAxes(), this.#settings);
   }
 
   #handleMotion(event) {

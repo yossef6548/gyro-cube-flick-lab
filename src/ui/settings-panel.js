@@ -12,6 +12,7 @@ const NUMBER_INPUTS = Object.freeze([
 ]);
 
 const CONTAINER_AXES = Object.freeze(['containerX', 'containerY', 'containerZ']);
+const CUBE_AXES = Object.freeze(['x', 'y', 'z']);
 
 export class SettingsPanel extends EventTarget {
   #dialog;
@@ -22,6 +23,7 @@ export class SettingsPanel extends EventTarget {
     super();
     this.#dialog = dialog;
     this.#form = form;
+    this.#ensureAxisDirectionControls();
     this.#settings = loadSettings();
     this.#bindEvents();
     this.#render();
@@ -66,6 +68,9 @@ export class SettingsPanel extends EventTarget {
         },
       ]),
     );
+    next.axisDirectionSigns = Object.fromEntries(
+      CUBE_AXES.map((axisName) => [axisName, Number(data.get(`${axisName}DirectionSign`)) || 1]),
+    );
 
     this.#settings = next;
     saveSettings(next);
@@ -88,6 +93,11 @@ export class SettingsPanel extends EventTarget {
       this.#form.elements[`${axisName}Sign`].value = String(axis.sign);
     }
 
+    for (const axisName of CUBE_AXES) {
+      const sign = this.#settings.axisDirectionSigns?.[axisName] ?? DEFAULT_SETTINGS.axisDirectionSigns[axisName];
+      this.#form.elements[`${axisName}DirectionSign`].value = String(sign);
+    }
+
     this.#renderOutputs();
   }
 
@@ -98,6 +108,37 @@ export class SettingsPanel extends EventTarget {
     setOutput('neutralThresholdOutput', this.#settings.neutralThreshold, 0, SETTING_UNITS.neutralThreshold);
     setOutput('neutralDurationOutput', this.#settings.neutralDurationMs, 0, SETTING_UNITS.neutralDurationMs);
     setOutput('smoothingOutput', this.#settings.smoothing, 2, SETTING_UNITS.smoothing);
+  }
+
+  #ensureAxisDirectionControls() {
+    if (this.#form.elements.xDirectionSign) return;
+
+    const section = document.createElement('section');
+    section.className = 'axis-settings';
+    section.setAttribute('aria-label', 'Cube axis snap direction');
+    section.innerHTML = `
+      <div class="section-copy">
+        <h3>Cube-axis snap direction</h3>
+        <p>
+          Use this when the detector selects the correct visible cube axis but the snap goes the
+          opposite way. This reverses only the final snap direction after axis selection, so it will
+          not cause the random mixed-axis behavior that happens when sensor axes are inverted.
+        </p>
+      </div>
+      ${CUBE_AXES.map((axisName) => `
+        <div class="axis-row">
+          <span>${axisName.toUpperCase()} snap</span>
+          <select id="${axisName}DirectionSign" name="${axisName}DirectionSign">
+            <option value="1">normal</option>
+            <option value="-1">reversed</option>
+          </select>
+          <span></span>
+        </div>
+      `).join('')}
+    `;
+
+    const footer = this.#form.querySelector('.dialog-footer');
+    this.#form.insertBefore(section, footer);
   }
 
   #emitChange() {
