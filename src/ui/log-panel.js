@@ -20,12 +20,13 @@ export class LogPanel {
     document.getElementById('eventLog').innerHTML = this.#entries.map((entry) => `<li>${escapeHtml(entry)}</li>`).join('');
   }
 
-  renderTelemetry(raw, screen, speed) {
+  renderTelemetry(raw, container, speed) {
     document.getElementById('rawAlpha').textContent = formatNumber(raw.alpha);
     document.getElementById('rawBeta').textContent = formatNumber(raw.beta);
     document.getElementById('rawGamma').textContent = formatNumber(raw.gamma);
-    document.getElementById('screenRateX').textContent = formatNumber(screen.x);
-    document.getElementById('screenRateY').textContent = formatNumber(screen.y);
-    document.getElementById('planarSpeed').textContent = formatNumber(speed);
+    document.getElementById('containerRateX').textContent = formatNumber(container.x);
+    document.getElementById('containerRateY').textContent = formatNumber(container.y);
+    document.getElementById('containerRateZ').textContent = formatNumber(container.z);
+    document.getElementById('spinSpeed').textContent = formatNumber(speed);
   }
 }
